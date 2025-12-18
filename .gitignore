@@ -1,0 +1,323 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# PEP 582
+__pypackages__/
+
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# Streamlit
+.streamlit/
+*.streamlit/
+
+# Streamlit cache and data
+.streamlit/cache/
+.streamlit/secrets.toml
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# PyCharm
+.idea/
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Generated data files (keep sample, ignore generated)
+# Keep: synthetic_marketing_data.csv (sample data)
+# Ignore: generated data files
+*_generated.csv
+*_output.csv
+data_*.csv
+!synthetic_marketing_data.csv
+
+# Docker
+docker-compose.override.yml
+.dockerignore
+
+# Docker volumes (if any)
+docker-data/
+postgres-data/
+metabase-data/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+*.swp
+*.swo
+
+# Python virtual environments
+venv/
+ENV/
+env/
+.venv/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+*.env
+
+# Secrets
+secrets/
+*.pem
+*.key
+*.cert
+
+# Data visualization outputs
+*.png
+*.jpg
+*.jpeg
+!README_images/
+data_visualization.png
+*_visualization.png
+
+# Test files
+test_*.py
+*_test.py
+tests/__pycache__/
+
+# Documentation builds
+docs/_build/
+site/
+
+# Coverage reports
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Profiling data
+.prof
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# Poetry
+poetry.lock
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath
+*.sage.py
+
+# Spyder
+.spyderproject
+.spyproject
+
+# Rope
+.ropeproject
+
+# mkdocs
+/site
+
+# Pyre
+.pyre/
+
+# Project specific
+*.csv.bak
+*.xlsx
+*.xls
+!synthetic_marketing_data.csv
+
+# Keep important files
+!requirements.txt
+!README.md
+!dataplan.md
+!prototype_plan.md
+
