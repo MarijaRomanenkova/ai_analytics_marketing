@@ -116,32 +116,71 @@ def generate_base_metrics(date: datetime, channel: str, campaign: str, config: D
             'clicks': clicks, 'conversions': conversions, 'revenue': round(revenue, 2)}
 
 def inject_anomalies(df: pd.DataFrame) -> pd.DataFrame:
-    mask1 = (df['date'] == '2025-02-15') & (df['campaign'] == 'Google_Search_Brand')
-    df.loc[mask1, 'spend'] *= 3.5
-    df.loc[mask1, 'impressions'] = (df.loc[mask1, 'impressions'] * 3.5).astype(int)
-    df.loc[mask1, 'clicks'] = (df.loc[mask1, 'clicks'] * 3.5).astype(int)
+    # Ensure date column is datetime and convert to date string for reliable comparison
+    df['date'] = pd.to_datetime(df['date'])
+    df['date_str'] = df['date'].dt.strftime('%Y-%m-%d')  # Add string column for comparison
     
-    mask2 = ((df['date'] >= '2025-03-10') & (df['date'] <= '2025-03-15') & (df['campaign'] == 'FB_Retargeting'))
-    df.loc[mask2, 'conversions'] = (df.loc[mask2, 'conversions'] * 0.3).astype(int)
-    df.loc[mask2, 'clicks'] = (df.loc[mask2, 'clicks'] * 0.5).astype(int)
-    df.loc[mask2, 'revenue'] *= 0.3
+    # Anomaly 1: Spending spike on Google_Search_Brand (Feb 15)
+    mask1 = (df['date_str'] == '2025-02-15') & (df['campaign'] == 'Google_Search_Brand')
+    if mask1.sum() > 0:
+        spend_before = df.loc[mask1, 'spend'].values[0]
+        df.loc[mask1, 'spend'] = df.loc[mask1, 'spend'] * 3.5
+        spend_after = df.loc[mask1, 'spend'].values[0]
+        df.loc[mask1, 'impressions'] = (df.loc[mask1, 'impressions'] * 3.5).astype(int)
+        df.loc[mask1, 'clicks'] = (df.loc[mask1, 'clicks'] * 3.5).astype(int)
+        logger.info(f"Anomaly 1 applied: {mask1.sum()} row(s) modified - Spend {spend_before:.2f} -> {spend_after:.2f} (x{spend_after/spend_before:.2f})")
+    else:
+        logger.warning(f"Anomaly 1: No rows matched! Looking for Feb 15, Google_Search_Brand")
     
-    mask3 = (df['date'] == '2025-02-23') & (df['campaign'] == 'Email_Newsletter')
-    df.loc[mask3, 'revenue'] *= 4.0
-    df.loc[mask3, 'conversions'] = (df.loc[mask3, 'conversions'] * 3.0).astype(int)
+    # Anomaly 2: Performance drop on FB_Retargeting (Mar 10-15)
+    mask2 = ((df['date_str'] >= '2025-03-10') & 
+             (df['date_str'] <= '2025-03-15') & 
+             (df['campaign'] == 'FB_Retargeting'))
+    if mask2.sum() > 0:
+        df.loc[mask2, 'conversions'] = (df.loc[mask2, 'conversions'] * 0.3).astype(int)
+        df.loc[mask2, 'clicks'] = (df.loc[mask2, 'clicks'] * 0.5).astype(int)
+        df.loc[mask2, 'revenue'] = df.loc[mask2, 'revenue'] * 0.3
+        logger.info(f"Anomaly 2 applied: {mask2.sum()} row(s) modified - Conversions reduced to 30%")
+    else:
+        logger.warning(f"Anomaly 2: No rows matched! Looking for Mar 10-15, FB_Retargeting")
     
-    mask4 = ((df['date'] >= '2025-02-01') & (df['date'] <= '2025-02-28') & (df['campaign'] == 'IG_Influencer'))
+    # Anomaly 3: Revenue spike on Email_Newsletter (Feb 23)
+    mask3 = (df['date_str'] == '2025-02-23') & (df['campaign'] == 'Email_Newsletter')
+    if mask3.sum() > 0:
+        revenue_before = df.loc[mask3, 'revenue'].values[0]
+        df.loc[mask3, 'revenue'] = df.loc[mask3, 'revenue'] * 4.0
+        revenue_after = df.loc[mask3, 'revenue'].values[0]
+        df.loc[mask3, 'conversions'] = (df.loc[mask3, 'conversions'] * 3.0).astype(int)
+        logger.info(f"Anomaly 3 applied: {mask3.sum()} row(s) modified - Revenue {revenue_before:.2f} -> {revenue_after:.2f} (x{revenue_after/revenue_before:.2f})")
+    else:
+        logger.warning(f"Anomaly 3: No rows matched! Looking for Feb 23, Email_Newsletter")
+    
+    # Anomaly 4: Gradual CTR decline on IG_Influencer (Feb 1-28)
+    mask4 = ((df['date_str'] >= '2025-02-01') & 
+             (df['date_str'] <= '2025-02-28') & 
+             (df['campaign'] == 'IG_Influencer'))
     if mask4.sum() > 0:
         feb_start = pd.to_datetime('2025-02-01')
         df.loc[mask4, 'days_elapsed'] = (df.loc[mask4, 'date'] - feb_start).dt.days
-        decline_factor = 1.0 - (df.loc[mask4, 'days_elapsed'] / 28 * 0.08)
+        decline_factor = 1.0 - (df.loc[mask4, 'days_elapsed'] / 28 * 0.08)  # 8% total decline
         df.loc[mask4, 'clicks'] = (df.loc[mask4, 'clicks'] * decline_factor).astype(int)
         df.loc[mask4, 'conversions'] = (df.loc[mask4, 'conversions'] * decline_factor).astype(int)
-        df.loc[mask4, 'revenue'] *= decline_factor
+        df.loc[mask4, 'revenue'] = df.loc[mask4, 'revenue'] * decline_factor
         df = df.drop(columns=['days_elapsed'], errors='ignore')
+        logger.info(f"Anomaly 4 applied: {mask4.sum()} row(s) modified - Gradual 8% decline")
+    else:
+        logger.warning(f"Anomaly 4: No rows matched! Looking for Feb 1-28, IG_Influencer")
     
-    mask5 = (df['date'].isin(['2025-03-22', '2025-03-23'])) & (df['campaign'] == 'Google_Display')
-    df.loc[mask5, ['spend', 'impressions', 'clicks', 'conversions', 'revenue']] = 0
+    # Anomaly 5: Budget exhaustion on Google_Display (Mar 22-23)
+    mask5 = (df['date_str'].isin(['2025-03-22', '2025-03-23'])) & (df['campaign'] == 'Google_Display')
+    if mask5.sum() > 0:
+        df.loc[mask5, ['spend', 'impressions', 'clicks', 'conversions', 'revenue']] = 0
+        logger.info(f"Anomaly 5 applied: {mask5.sum()} row(s) modified - Budget exhaustion")
+    else:
+        logger.warning(f"Anomaly 5: No rows matched! Looking for Mar 22-23, Google_Display")
+    
+    # Remove temporary date_str column
+    df = df.drop(columns=['date_str'], errors='ignore')
     
     df['clicks'] = np.minimum(df['clicks'], df['impressions'])
     df['conversions'] = np.minimum(df['conversions'], df['clicks'])
@@ -162,8 +201,7 @@ def generate_synthetic_data(seed: int = 42) -> pd.DataFrame:
                     data.append(metrics)
     
     df = pd.DataFrame(data)
-    df = inject_anomalies(df)
-    df['date'] = pd.to_datetime(df['date'])
+    df = inject_anomalies(df)  # This now handles date conversion
     df = df.sort_values('date').reset_index(drop=True)
     
     logger.info(f"Generated {len(df)} records")
