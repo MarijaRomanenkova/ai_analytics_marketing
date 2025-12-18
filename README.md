@@ -49,7 +49,13 @@ pip install -r requirements.txt
 Generate synthetic marketing data using the included script:
 
 ```bash
-python generate_synthetic_data.py --visualize
+python generate_synthetic_data.py
+```
+
+Or with custom seed/output:
+
+```bash
+python generate_synthetic_data.py --seed 42 --output synthetic_marketing_data.csv
 ```
 
 This creates `synthetic_marketing_data.csv` with:
