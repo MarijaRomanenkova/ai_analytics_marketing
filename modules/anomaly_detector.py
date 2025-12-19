@@ -1,12 +1,13 @@
 """
 Anomaly detection module
-Identifies statistical anomalies using Z-scores and pattern detection
+Identifies statistical anomalies using Z-scores and ML-based pattern detection
 """
 
 import pandas as pd
 import numpy as np
 from typing import List, Dict, Tuple
 from sklearn.preprocessing import StandardScaler
+from sklearn.ensemble import IsolationForest
 
 
 def detect_point_anomalies(
@@ -259,4 +260,82 @@ def get_critical_anomalies(df: pd.DataFrame, severity_threshold: float = 3.0) ->
     ].copy()
     
     return critical.sort_values('date', ascending=False)
+
+
+def detect_ml_anomalies(
+    df: pd.DataFrame,
+    columns: List[str] = ['spend', 'conversions', 'revenue', 'ctr'],
+    contamination: float = 0.1
+) -> pd.DataFrame:
+    """
+    Detect anomalies using Isolation Forest (ML-based algorithm).
+    
+    Isolation Forest is an unsupervised ML algorithm that identifies anomalies
+    by isolating outliers in the feature space. This complements Z-score detection
+    by finding complex multi-dimensional anomalies.
+    
+    Args:
+        df: DataFrame with metrics
+        columns: Columns to use for anomaly detection
+        contamination: Expected proportion of anomalies (0.1 = 10%)
+    
+    Returns:
+        DataFrame with added ML anomaly flags
+    """
+    df = df.copy()
+    
+    # Initialize ML anomaly flag if not exists
+    if 'ml_anomaly' not in df.columns:
+        df['ml_anomaly'] = False
+        df['ml_anomaly_score'] = 0.0
+    
+    # Select available columns
+    feature_cols = [col for col in columns if col in df.columns]
+    
+    if len(feature_cols) < 2:
+        # Need at least 2 features for ML detection
+        return df
+    
+    # Prepare features (handle NaN values)
+    X = df[feature_cols].fillna(0).values
+    
+    if len(X) < 10:
+        # Need minimum data points
+        return df
+    
+    # Normalize features
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+    
+    # Train Isolation Forest
+    iso_forest = IsolationForest(
+        contamination=contamination,
+        random_state=42,
+        n_estimators=100
+    )
+    
+    # Predict anomalies (-1 = anomaly, 1 = normal)
+    predictions = iso_forest.fit_predict(X_scaled)
+    anomaly_scores = iso_forest.score_samples(X_scaled)
+    
+    # Update DataFrame
+    df['ml_anomaly'] = predictions == -1
+    df['ml_anomaly_score'] = -anomaly_scores  # Lower score = more anomalous
+    
+    # Merge with existing anomaly flags
+    df.loc[df['ml_anomaly'], 'is_anomaly'] = True
+    df.loc[df['ml_anomaly'], 'anomaly_type'] = df.loc[df['ml_anomaly'], 'anomaly_type'] + 'ML-detected; '
+    
+    # Update severity for ML anomalies (normalize score to 0-5 range)
+    ml_mask = df['ml_anomaly']
+    if ml_mask.any():
+        min_score = df.loc[ml_mask, 'ml_anomaly_score'].min()
+        max_score = df.loc[ml_mask, 'ml_anomaly_score'].max()
+        if max_score > min_score:
+            normalized_severity = 1 + 4 * (df.loc[ml_mask, 'ml_anomaly_score'] - min_score) / (max_score - min_score)
+            df.loc[ml_mask, 'anomaly_severity'] = df.loc[ml_mask, 'anomaly_severity'].combine(
+                normalized_severity, max
+            )
+    
+    return df
 

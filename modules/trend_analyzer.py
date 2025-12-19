@@ -224,3 +224,103 @@ def detect_seasonal_patterns(df: pd.DataFrame) -> list:
     
     return insights
 
+
+def forecast_metric(
+    df: pd.DataFrame,
+    metric: str = 'conversions',
+    days_ahead: int = 7
+) -> Tuple[pd.DataFrame, Dict]:
+    """
+    Forecast future metric values using linear regression (ML-based prediction).
+    
+    Uses the trend from historical data to predict future values.
+    
+    Args:
+        df: DataFrame sorted by date with metric column
+        metric: Column name to forecast
+        days_ahead: Number of days to forecast ahead
+    
+    Returns:
+        Tuple of (forecast_df, forecast_stats)
+        
+        forecast_df contains:
+        - date: Future dates
+        - {metric}_forecast: Predicted values
+        - {metric}_forecast_lower: Lower confidence bound
+        - {metric}_forecast_upper: Upper confidence bound
+        
+        forecast_stats contains:
+        - next_value: Predicted value for next day
+        - trend_direction: 'increasing' or 'decreasing'
+        - confidence: 'high' | 'medium' | 'low'
+    """
+    df = df.copy()
+    df = df.sort_values('date').reset_index(drop=True)
+    
+    if len(df) < 7:
+        # Not enough data for forecasting
+        return pd.DataFrame(), {
+            'next_value': 0,
+            'trend_direction': 'unknown',
+            'confidence': 'low'
+        }
+    
+    # Prepare data for regression
+    X = np.arange(len(df)).reshape(-1, 1)
+    y = df[metric].values
+    
+    # Fit linear regression
+    model = LinearRegression()
+    model.fit(X, y)
+    
+    # Calculate residuals for confidence intervals
+    y_pred = model.predict(X)
+    residuals = y - y_pred
+    std_error = np.std(residuals)
+    
+    # Generate future dates
+    last_date = df['date'].max()
+    future_dates = pd.date_range(
+        start=last_date + pd.Timedelta(days=1),
+        periods=days_ahead,
+        freq='D'
+    )
+    
+    # Predict future values
+    future_X = np.arange(len(df), len(df) + days_ahead).reshape(-1, 1)
+    future_y = model.predict(future_X)
+    
+    # Calculate confidence intervals (±1.96 * std_error for 95% confidence)
+    confidence_interval = 1.96 * std_error
+    
+    # Create forecast DataFrame
+    forecast_df = pd.DataFrame({
+        'date': future_dates,
+        f'{metric}_forecast': future_y,
+        f'{metric}_forecast_lower': future_y - confidence_interval,
+        f'{metric}_forecast_upper': future_y + confidence_interval
+    })
+    
+    # Calculate R² for confidence assessment
+    ss_res = np.sum(residuals ** 2)
+    ss_tot = np.sum((y - np.mean(y)) ** 2)
+    r_squared = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0
+    
+    # Determine confidence level
+    if r_squared > 0.7:
+        confidence = 'high'
+    elif r_squared > 0.4:
+        confidence = 'medium'
+    else:
+        confidence = 'low'
+    
+    forecast_stats = {
+        'next_value': float(future_y[0]),
+        'trend_direction': 'increasing' if model.coef_[0] > 0 else 'decreasing',
+        'confidence': confidence,
+        'r_squared': float(r_squared),
+        'forecast_days': days_ahead
+    }
+    
+    return forecast_df, forecast_stats
+

@@ -5,8 +5,9 @@ An intelligent analytics dashboard for SME marketing campaigns, featuring AI-pow
 ## 🚀 Features
 
 ### Core AI Capabilities
-- **🔍 Anomaly Detection**: Detects 5 types of anomalies
-  - Point anomalies (spending spikes, revenue spikes, performance drops)
+- **🔍 Anomaly Detection**: Detects 5 types of anomalies using multiple methods
+  - **Statistical**: Z-score based point anomalies (spending spikes, revenue spikes, performance drops)
+  - **ML-Based**: Isolation Forest algorithm for multi-dimensional anomaly detection
   - Gradual anomalies (CTR decline over time)
   - Budget anomalies (unexpected zero-spend periods)
 
@@ -14,6 +15,11 @@ An intelligent analytics dashboard for SME marketing campaigns, featuring AI-pow
   - 7-day moving averages
   - Linear regression with confidence scores
   - Trend strength classification
+
+- **🔮 Predictive Forecasting**: 
+  - ML-based 7-day forecasts using linear regression
+  - Confidence intervals and trend direction predictions
+  - Visual forecast charts with uncertainty bounds
 
 - **💡 Automated Insights**: 
   - 5-10 prioritized, actionable insights
@@ -147,7 +153,8 @@ prototype/
 - **📈 Trends**: Time-series charts with trend lines
 - **🏆 Channels**: Channel performance comparison
 - **🎯 Campaigns**: Detailed campaign metrics table
-- **🔍 Anomalies**: Anomaly detection results and scatter plots
+- **🔍 Anomalies**: Anomaly detection results (statistical + ML-based) and scatter plots
+- **🔮 Forecast**: ML-powered 7-day predictions with confidence intervals
 
 ### 4. Export
 - Download campaign performance data as CSV
@@ -233,5 +240,10 @@ This prototype successfully demonstrates:
 
 ---
 
-**Built with ❤️ using Streamlit, Pandas, Scikit-learn, and Plotly**
+**Built with ❤️ using Streamlit, Pandas, Scikit-learn (Isolation Forest, Linear Regression), and Plotly**
+
+### 🤖 AI/ML Technologies Used
+- **Isolation Forest** (scikit-learn): Unsupervised ML algorithm for anomaly detection
+- **Linear Regression** (scikit-learn): ML-based trend analysis and forecasting
+- **Statistical Methods**: Z-score analysis, moving averages for complementary insights
 

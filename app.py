@@ -21,9 +21,11 @@ from modules import (
     detect_point_anomalies,
     detect_gradual_anomalies,
     detect_zero_spend_anomalies,
+    detect_ml_anomalies,
     get_anomaly_summary,
     analyze_trends,
     analyze_multiple_metrics,
+    forecast_metric,
     generate_insights,
     create_timeseries_chart,
     create_channel_comparison_chart,
@@ -196,15 +198,19 @@ def main():
     
     # Run AI analysis
     with st.spinner("🤖 Running AI analysis..."):
-        # Anomaly detection
+        # Anomaly detection (statistical + ML)
         df = detect_point_anomalies(df)
         df = detect_gradual_anomalies(df)
         df = detect_zero_spend_anomalies(df)
+        df = detect_ml_anomalies(df)  # ML-based anomaly detection
         anomaly_summary = get_anomaly_summary(df)
         
         # Trend analysis
         df_by_date = aggregate_by_date(df)
         df_by_date, trend_stats = analyze_multiple_metrics(df_by_date, ['conversions', 'revenue', 'spend'])
+        
+        # ML-based forecasting
+        forecast_df, forecast_stats = forecast_metric(df_by_date, metric='conversions', days_ahead=7)
         
         # Generate insights
         insights = generate_insights(
@@ -288,7 +294,7 @@ def main():
     st.header("📊 Performance Analysis")
     
     # Create tabs for different views
-    tab1, tab2, tab3, tab4 = st.tabs(["📈 Trends", "🏆 Channels", "🎯 Campaigns", "🔍 Anomalies"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📈 Trends", "🏆 Channels", "🎯 Campaigns", "🔍 Anomalies", "🔮 Forecast"])
     
     with tab1:
         st.subheader("Conversions Over Time")
@@ -420,6 +426,115 @@ def main():
             )
         else:
             st.success("✅ No anomalies detected! Your campaigns are performing consistently.")
+    
+    with tab5:
+        st.subheader("🔮 AI-Powered Forecast")
+        
+        if len(forecast_df) > 0:
+            # Forecast summary
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.metric(
+                    "Next Day Prediction",
+                    f"{forecast_stats['next_value']:.0f} conversions",
+                    help="Predicted conversions for tomorrow"
+                )
+            
+            with col2:
+                direction_emoji = "📈" if forecast_stats['trend_direction'] == 'increasing' else "📉"
+                st.metric(
+                    "Trend Direction",
+                    f"{direction_emoji} {forecast_stats['trend_direction'].title()}",
+                    help="Predicted trend direction"
+                )
+            
+            with col3:
+                confidence_colors = {'high': '🟢', 'medium': '🟡', 'low': '🔴'}
+                st.metric(
+                    "Confidence",
+                    f"{confidence_colors.get(forecast_stats['confidence'], '⚪')} {forecast_stats['confidence'].title()}",
+                    help=f"Model confidence (R² = {forecast_stats['r_squared']:.2f})"
+                )
+            
+            # Forecast chart
+            st.subheader("7-Day Forecast")
+            
+            # Combine historical and forecast data for visualization
+            historical = df_by_date[['date', 'conversions']].copy()
+            historical['type'] = 'Historical'
+            
+            forecast_viz = forecast_df[['date', 'conversions_forecast']].copy()
+            forecast_viz = forecast_viz.rename(columns={'conversions_forecast': 'conversions'})
+            forecast_viz['type'] = 'Forecast'
+            
+            # Create visualization
+            import plotly.graph_objects as go
+            
+            fig = go.Figure()
+            
+            # Historical data
+            fig.add_trace(go.Scatter(
+                x=historical['date'],
+                y=historical['conversions'],
+                mode='lines+markers',
+                name='Historical',
+                line=dict(color='#1f77b4', width=2)
+            ))
+            
+            # Forecast
+            fig.add_trace(go.Scatter(
+                x=forecast_df['date'],
+                y=forecast_df['conversions_forecast'],
+                mode='lines+markers',
+                name='Forecast',
+                line=dict(color='#ff7f0e', width=2, dash='dash')
+            ))
+            
+            # Confidence interval
+            fig.add_trace(go.Scatter(
+                x=forecast_df['date'].tolist() + forecast_df['date'].tolist()[::-1],
+                y=forecast_df['conversions_forecast_upper'].tolist() + forecast_df['conversions_forecast_lower'].tolist()[::-1],
+                fill='toself',
+                fillcolor='rgba(255, 127, 14, 0.2)',
+                line=dict(color='rgba(255,255,255,0)'),
+                name='95% Confidence Interval',
+                showlegend=True
+            ))
+            
+            fig.update_layout(
+                title="Conversions Forecast (Next 7 Days)",
+                xaxis_title="Date",
+                yaxis_title="Conversions",
+                hovermode='x unified',
+                height=400
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Forecast details table
+            st.subheader("Forecast Details")
+            forecast_display = forecast_df.copy()
+            forecast_display = forecast_display.rename(columns={
+                'conversions_forecast': 'Predicted Conversions',
+                'conversions_forecast_lower': 'Lower Bound',
+                'conversions_forecast_upper': 'Upper Bound'
+            })
+            forecast_display['date'] = forecast_display['date'].dt.strftime('%Y-%m-%d')
+            
+            st.dataframe(
+                forecast_display.style.format({
+                    'Predicted Conversions': '{:.0f}',
+                    'Lower Bound': '{:.0f}',
+                    'Upper Bound': '{:.0f}'
+                }),
+                use_container_width=True
+            )
+            
+            st.info(f"💡 **Note**: Forecast uses ML-based linear regression. Confidence is {forecast_stats['confidence']} (R² = {forecast_stats['r_squared']:.2f}). "
+                   f"Forecasts assume current trends continue and don't account for external factors.")
+        else:
+            st.warning("⚠️ Not enough data for forecasting. Need at least 7 days of historical data.")
     
     # Footer
     st.markdown("---")
