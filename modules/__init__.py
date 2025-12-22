@@ -20,6 +20,7 @@ from .anomaly_detector import (
 )
 from .trend_analyzer import analyze_trends, analyze_multiple_metrics, forecast_metric
 from .insight_generator import generate_insights
+from .optimizer import optimize_budget_allocation, generate_optimization_insights
 from .visualizer import (
     create_timeseries_chart,
     create_channel_comparison_chart,
@@ -46,6 +47,8 @@ __all__ = [
     'analyze_multiple_metrics',
     'forecast_metric',
     'generate_insights',
+    'optimize_budget_allocation',
+    'generate_optimization_insights',
     'create_timeseries_chart',
     'create_channel_comparison_chart',
     'create_campaign_table',

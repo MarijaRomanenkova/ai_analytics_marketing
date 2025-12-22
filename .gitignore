@@ -321,3 +321,6 @@ celerybeat.pid
 !dataplan.md
 !prototype_plan.md
 
+# Analysis/documentation files (not needed in repo)
+CAPABILITY_ANALYSIS.md
+

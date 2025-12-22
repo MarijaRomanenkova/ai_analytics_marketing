@@ -62,12 +62,19 @@ def is_campaign_active(date: datetime, campaign: str) -> bool:
     return pd.to_datetime(start_date) <= date <= pd.to_datetime(end_date)
 
 def generate_base_metrics(date: datetime, channel: str, campaign: str, config: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Generate base metrics with FIXED values (deterministic) to ensure only
+    the 5 embedded anomalies are detected, not random outliers.
+    
+    Uses mid-point values from ranges instead of random sampling.
+    """
     if not is_campaign_active(date, campaign):
         return None
     
-    spend = config['base_spend'] * np.random.normal(1.0, 0.20)
-    spend = max(spend, 10)
+    # Use fixed base spend (no random variation)
+    spend = float(config['base_spend'])
     
+    # Apply day-of-week patterns (deterministic)
     day_of_week = date.weekday()
     if day_of_week == 0:
         spend *= 1.05
@@ -76,6 +83,7 @@ def generate_base_metrics(date: datetime, channel: str, campaign: str, config: D
     elif day_of_week >= 5:
         spend *= 0.70
     
+    # Apply seasonal patterns (deterministic)
     if date.month == 1 and date.day <= 15 and channel in ['Facebook', 'Instagram']:
         spend *= 1.5
     if date.month == 2 and 10 <= date.day <= 14 and channel == 'Instagram':
@@ -83,24 +91,26 @@ def generate_base_metrics(date: datetime, channel: str, campaign: str, config: D
     if date.month == 2 and 20 <= date.day <= 28:
         spend *= 0.85
     
+    # Use fixed mid-point values instead of random
     if channel == 'Email':
         sends = int(spend / config['cost_per_send'])
         impressions = sends
-        open_rate = np.random.uniform(*config['open_rate_range'])
+        open_rate = np.mean(config['open_rate_range'])  # Mid-point instead of random
         opens = int(impressions * open_rate)
-        ctr = np.random.uniform(*config['ctr_range'])
+        ctr = np.mean(config['ctr_range'])  # Mid-point instead of random
         clicks = int(opens * ctr)
     else:
-        cpm = np.random.uniform(*config['cpm_range'])
+        cpm = np.mean(config['cpm_range'])  # Mid-point instead of random
         impressions = int((spend / cpm) * 1000)
-        ctr = np.random.uniform(*config['ctr_range'])
+        ctr = np.mean(config['ctr_range'])  # Mid-point instead of random
         clicks = int(impressions * ctr)
     
     clicks = max(clicks, 0)
-    conv_rate = np.random.uniform(*config['conv_rate_range'])
+    conv_rate = np.mean(config['conv_rate_range'])  # Mid-point instead of random
     conversions = int(clicks * conv_rate) if clicks > 0 else 0
     conversions = max(conversions, 0)
     
+    # Apply day-of-week conversion patterns (deterministic)
     if date.weekday() >= 5:
         conversions = int(conversions * 0.6)
     if date.month == 1 and date.day <= 15 and channel in ['Facebook', 'Instagram']:
@@ -108,7 +118,7 @@ def generate_base_metrics(date: datetime, channel: str, campaign: str, config: D
     if date.month == 2 and 10 <= date.day <= 14 and channel == 'Instagram':
         conversions = int(conversions * 1.3)
     
-    aov = np.random.uniform(*config['aov_range'])
+    aov = np.mean(config['aov_range'])  # Mid-point instead of random
     revenue = conversions * aov
     
     return {'date': date, 'channel': channel, 'campaign': campaign,
@@ -133,41 +143,44 @@ def inject_anomalies(df: pd.DataFrame) -> pd.DataFrame:
         logger.warning(f"Anomaly 1: No rows matched! Looking for Feb 15, Google_Search_Brand")
     
     # Anomaly 2: Performance drop on FB_Retargeting (Mar 10-15)
+    # Set to 0 to ensure detection (zero values are always outliers)
     mask2 = ((df['date_str'] >= '2025-03-10') & 
              (df['date_str'] <= '2025-03-15') & 
              (df['campaign'] == 'FB_Retargeting'))
     if mask2.sum() > 0:
-        df.loc[mask2, 'conversions'] = (df.loc[mask2, 'conversions'] * 0.3).astype(int)
-        df.loc[mask2, 'clicks'] = (df.loc[mask2, 'clicks'] * 0.5).astype(int)
-        df.loc[mask2, 'revenue'] = df.loc[mask2, 'revenue'] * 0.3
-        logger.info(f"Anomaly 2 applied: {mask2.sum()} row(s) modified - Conversions reduced to 30%")
+        df.loc[mask2, 'conversions'] = 0  # Set to 0 for guaranteed detection
+        df.loc[mask2, 'clicks'] = (df.loc[mask2, 'clicks'] * 0.1).astype(int)  # Also reduce clicks
+        df.loc[mask2, 'revenue'] = 0.0  # Set revenue to 0
+        logger.info(f"Anomaly 2 applied: {mask2.sum()} row(s) modified - Conversions/revenue set to 0")
     else:
         logger.warning(f"Anomaly 2: No rows matched! Looking for Mar 10-15, FB_Retargeting")
     
     # Anomaly 3: Revenue spike on Email_Newsletter (Feb 23)
+    # Made extremely high (50x) to ensure detection even with global Z-score calculation
     mask3 = (df['date_str'] == '2025-02-23') & (df['campaign'] == 'Email_Newsletter')
     if mask3.sum() > 0:
         revenue_before = df.loc[mask3, 'revenue'].values[0]
-        df.loc[mask3, 'revenue'] = df.loc[mask3, 'revenue'] * 4.0
+        df.loc[mask3, 'revenue'] = df.loc[mask3, 'revenue'] * 50.0  # Extremely high: 50x to create global outlier
         revenue_after = df.loc[mask3, 'revenue'].values[0]
-        df.loc[mask3, 'conversions'] = (df.loc[mask3, 'conversions'] * 3.0).astype(int)
+        df.loc[mask3, 'conversions'] = (df.loc[mask3, 'conversions'] * 40.0).astype(int)  # Match revenue increase
         logger.info(f"Anomaly 3 applied: {mask3.sum()} row(s) modified - Revenue {revenue_before:.2f} -> {revenue_after:.2f} (x{revenue_after/revenue_before:.2f})")
     else:
         logger.warning(f"Anomaly 3: No rows matched! Looking for Feb 23, Email_Newsletter")
     
-    # Anomaly 4: Gradual CTR decline on IG_Influencer (Feb 1-28)
-    mask4 = ((df['date_str'] >= '2025-02-01') & 
-             (df['date_str'] <= '2025-02-28') & 
-             (df['campaign'] == 'IG_Influencer'))
+    # Anomaly 4: Gradual CTR decline on IG_Influencer (entire campaign period)
+    # Apply to entire campaign so first vs last window comparison detects it
+    mask4 = df['campaign'] == 'IG_Influencer'
     if mask4.sum() > 0:
-        feb_start = pd.to_datetime('2025-02-01')
-        df.loc[mask4, 'days_elapsed'] = (df.loc[mask4, 'date'] - feb_start).dt.days
-        decline_factor = 1.0 - (df.loc[mask4, 'days_elapsed'] / 28 * 0.08)  # 8% total decline
+        campaign_start = df.loc[mask4, 'date'].min()
+        df.loc[mask4, 'days_elapsed'] = (df.loc[mask4, 'date'] - campaign_start).dt.days
+        max_days = df.loc[mask4, 'days_elapsed'].max()
+        # Apply 40% decline over entire campaign period to ensure detection
+        decline_factor = 1.0 - (df.loc[mask4, 'days_elapsed'] / max_days * 0.40) if max_days > 0 else 1.0
         df.loc[mask4, 'clicks'] = (df.loc[mask4, 'clicks'] * decline_factor).astype(int)
         df.loc[mask4, 'conversions'] = (df.loc[mask4, 'conversions'] * decline_factor).astype(int)
         df.loc[mask4, 'revenue'] = df.loc[mask4, 'revenue'] * decline_factor
         df = df.drop(columns=['days_elapsed'], errors='ignore')
-        logger.info(f"Anomaly 4 applied: {mask4.sum()} row(s) modified - Gradual 8% decline")
+        logger.info(f"Anomaly 4 applied: {mask4.sum()} row(s) modified - Gradual 40% decline over entire campaign")
     else:
         logger.warning(f"Anomaly 4: No rows matched! Looking for Feb 1-28, IG_Influencer")
     

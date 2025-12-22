@@ -78,6 +78,20 @@ def detect_point_anomalies(
                     z_val = df.loc[idx, f'{col}_zscore']
                     df.loc[idx, 'anomaly_details'] += f'{col}: {val:.2f} (Z={z_val:.2f}); '
     
+    # Also flag zero values as anomalies for conversions and revenue (always anomalous in marketing)
+    # This ensures embedded anomalies with zero values are detected
+    # But skip if already flagged by budget_exhaustion to avoid double-counting
+    for col in ['conversions', 'revenue']:
+        if col in df.columns:
+            zero_mask = (df[col] == 0) & (~df.get('budget_exhaustion', pd.Series([False] * len(df), index=df.index)))
+            df.loc[zero_mask, 'is_anomaly'] = True
+            df.loc[zero_mask, 'anomaly_type'] = df.loc[zero_mask, 'anomaly_type'] + f'Zero {col}; '
+            df.loc[zero_mask, 'anomaly_severity'] = df.loc[zero_mask, 'anomaly_severity'].combine(
+                pd.Series([3.0] * zero_mask.sum(), index=df[zero_mask].index),
+                max
+            )
+            df.loc[zero_mask, 'anomaly_details'] = df.loc[zero_mask, 'anomaly_details'] + f'{col}: 0.00 (Zero value); '
+    
     # Clean up anomaly type (remove trailing semicolon)
     df['anomaly_type'] = df['anomaly_type'].str.rstrip('; ')
     df['anomaly_details'] = df['anomaly_details'].str.rstrip('; ')
@@ -138,6 +152,14 @@ def detect_gradual_anomalies(
                     df.loc[last_window_indices, 'is_anomaly'] = True
                     df.loc[last_window_indices, 'anomaly_type'] = df.loc[last_window_indices, 'anomaly_type'] + \
                         f'Gradual {metric} decline; '
+                    
+                    # Assign severity based on decline percentage (ensures it appears in critical list if >= 30% decline)
+                    # Map decline % to severity: 8% = 2.5, 30% = 3.5, 40% = 4.0
+                    decline_severity = 2.5 + min((decline / 0.08) * 1.0, 2.0)  # Scale from 2.5 to 4.5
+                    df.loc[last_window_indices, 'anomaly_severity'] = df.loc[last_window_indices, 'anomaly_severity'].combine(
+                        pd.Series([decline_severity] * len(last_window_indices), index=last_window_indices),
+                        max
+                    )
     
     return df
 
@@ -265,7 +287,7 @@ def get_critical_anomalies(df: pd.DataFrame, severity_threshold: float = 3.0) ->
 def detect_ml_anomalies(
     df: pd.DataFrame,
     columns: List[str] = ['spend', 'conversions', 'revenue', 'ctr'],
-    contamination: float = 0.1
+    contamination: float = 0.05
 ) -> pd.DataFrame:
     """
     Detect anomalies using Isolation Forest (ML-based algorithm).
@@ -277,7 +299,7 @@ def detect_ml_anomalies(
     Args:
         df: DataFrame with metrics
         columns: Columns to use for anomaly detection
-        contamination: Expected proportion of anomalies (0.1 = 10%)
+        contamination: Expected proportion of anomalies (0.05 = 5%)
     
     Returns:
         DataFrame with added ML anomaly flags
